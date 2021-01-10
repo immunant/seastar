@@ -66,12 +66,13 @@ using dl_iterate_fn = int (*) (int (*callback) (struct dl_phdr_info *info, size_
 
 [[gnu::no_sanitize_address]]
 static dl_iterate_fn dl_iterate_phdr_org() {
-    static dl_iterate_fn org = [] {
-        auto org = (dl_iterate_fn)dlsym (RTLD_NEXT, "dl_iterate_phdr");
-        assert(org);
-        return org;
-    }();
-    return org;
+    // static dl_iterate_fn org = [] {
+    //     auto org = (dl_iterate_fn)dlsym (RTLD_NEXT, "dl_iterate_phdr");
+    //     assert(org);
+    //     return org;
+    // }();
+    // return org;
+    return &dl_iterate_phdr;
 }
 
 // phdrs_cache has to remain valid until very late in the process
@@ -108,28 +109,28 @@ void log_exception_trace() noexcept {}
 
 }
 
-extern "C"
-[[gnu::visibility("default")]]
-[[gnu::used]]
-[[gnu::no_sanitize_address]]
-int dl_iterate_phdr(int (*callback) (struct dl_phdr_info *info, size_t size, void *data), void *data) {
-    if (!seastar::local_engine || !seastar::phdrs_cache) {
-        // Cache is not yet populated, pass through to original function
-        return seastar::dl_iterate_phdr_org()(callback, data);
-    }
-    int r = 0;
-    for (auto h : *seastar::phdrs_cache) {
-        // Pass dl_phdr_info size that does not include dlpi_adds and dlpi_subs.
-        // This forces libgcc to disable caching which is not thread safe and
-        // requires dl_iterate_phdr to serialize calls to callback. Since we do
-        // not serialize here we have to disable caching.
-        r = callback(&h, offsetof(dl_phdr_info, dlpi_adds), data);
-        if (r) {
-            break;
-        }
-    }
-    return r;
-}
+// extern "C"
+// [[gnu::visibility("default")]]
+// [[gnu::used]]
+// [[gnu::no_sanitize_address]]
+// int dl_iterate_phdr(int (*callback) (struct dl_phdr_info *info, size_t size, void *data), void *data) {
+//     if (!seastar::local_engine || !seastar::phdrs_cache) {
+//         // Cache is not yet populated, pass through to original function
+//         return seastar::dl_iterate_phdr_org()(callback, data);
+//     }
+//     int r = 0;
+//     for (auto h : *seastar::phdrs_cache) {
+//         // Pass dl_phdr_info size that does not include dlpi_adds and dlpi_subs.
+//         // This forces libgcc to disable caching which is not thread safe and
+//         // requires dl_iterate_phdr to serialize calls to callback. Since we do
+//         // not serialize here we have to disable caching.
+//         r = callback(&h, offsetof(dl_phdr_info, dlpi_adds), data);
+//         if (r) {
+//             break;
+//         }
+//     }
+//     return r;
+// }
 
 #ifndef NO_EXCEPTION_INTERCEPT
 extern "C"
